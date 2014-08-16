@@ -40,11 +40,11 @@ type Feed struct {
 }
 
 type Message struct {
-	Feed        *datastore.Key `json:"-"`
-	Created     time.Time      `datastore:",noindex" json:"created"`
-	RemoteAddr  string         `datastore:",noindex" json:"remote_addr"`
-	QueryString string         `datastore:",noindex" json:"query"`
-	Body        []byte         `json:"body"`
+	Created     time.Time   `json:"created"`
+	RemoteAddr  string      `json:"remote_addr"`
+	QueryString string      `json:"query"`
+	Header      http.Header `json:"header"`
+	Body        []byte      `json:"body"`
 }
 
 var templates = template.Must(template.New("").ParseGlob("templates/*.html"))
@@ -103,7 +103,7 @@ func getFeed(c appengine.Context, kstr string) (*Feed, error) {
 
 func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	kstr := r.URL.Path[8:]
-	feed, err := getFeed(c, kstr)
+	_, err := getFeed(c, kstr)
 	if err != nil {
 		reportError(c, w, err)
 		return
@@ -116,9 +116,9 @@ func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg := &Message{
-		Feed:        feed.Key,
 		Created:     time.Now().UTC(),
 		RemoteAddr:  r.RemoteAddr,
+		Header:      r.Header,
 		QueryString: r.URL.Query().Encode(),
 		Body:        body,
 	}
@@ -133,7 +133,6 @@ func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	if _, err := taskqueue.Add(c, &taskqueue.Task{
 		Method:  "PULL",
 		Payload: buf.Bytes(),
-		Header:  r.Header,
 		Tag:     kstr,
 	}, "todo"); err != nil {
 		reportError(c, w, err)
@@ -169,7 +168,7 @@ func handlePull(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	j := json.NewEncoder(w)
 	err = j.Encode(map[string]interface{}{
 		"tid":         task.Name,
-		"headers":     task.Header,
+		"headers":     msg.Header,
 		"created":     msg.Created,
 		"query":       msg.QueryString,
 		"remote_addr": msg.RemoteAddr,
