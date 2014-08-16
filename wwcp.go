@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -89,15 +91,69 @@ func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/feeds/", http.StatusFound)
 }
 
+type cachedFeed struct {
+	feed *Feed
+	ttl  time.Time
+}
+
+func (c *cachedFeed) Feed() *Feed {
+	if c == nil {
+		return nil
+	}
+	return c.feed
+}
+
+type feedCacheT struct {
+	m  map[string]*cachedFeed
+	mu sync.Mutex
+}
+
+func (f *feedCacheT) Get(name string) (*Feed, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	cf, ok := f.m[name]
+	if cf != nil && cf.ttl.Before(time.Now()) {
+		delete(f.m, name)
+		cf.feed = nil
+		ok = false
+	}
+	return cf.Feed(), ok
+}
+
+func (f *feedCacheT) Set(name string, feed *Feed) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.m[name] = &cachedFeed{feed: feed, ttl: time.Now().Add(time.Hour)}
+}
+
+var (
+	feedCache = &feedCacheT{m: map[string]*cachedFeed{}}
+	errNoFeed = errors.New("no such feed")
+)
+
 func getFeed(c appengine.Context, kstr string) (*Feed, error) {
+	feed, ok := feedCache.Get(kstr)
+	if ok {
+		if feed == nil {
+			return nil, errNoFeed
+		}
+		return feed, nil
+	}
+
 	k, err := datastore.DecodeKey(kstr)
 	if err != nil {
 		return nil, err
 	}
 
-	feed := &Feed{}
+	feed = &Feed{}
 	err = datastore.Get(c, k, feed)
 	feed.Key = k
+	if err == nil {
+		feedCache.Set(kstr, feed)
+	} else {
+		feedCache.Set(kstr, nil)
+	}
 	return feed, err
 }
 
