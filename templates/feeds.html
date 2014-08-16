@@ -1,0 +1,20 @@
+<html>
+  <head>
+    <title>Feeds</title>
+  </head>
+
+  <body>
+    <h1>Feeds</h1>
+
+    <ul>
+    {{ range . }}
+    <li>{{ .Name }} - {{ .Key.Encode }}</li>
+    {{ end }}
+    </ul>
+
+    <h1>New Feed</h1>
+    <form method="POST" action="/feeds/new">
+      <input type="text" name="name" /> <input type="submit" />
+    </form>
+  </body>
+</html>
