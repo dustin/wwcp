@@ -172,6 +172,7 @@ func compress(c appengine.Context, in []byte) []byte {
 		c.Warningf("Error closing compressed stream: %v", err)
 		return in
 	}
+	c.Infof("Compressed from %v to %v", len(in), buf.Len())
 	return buf.Bytes()
 }
 
