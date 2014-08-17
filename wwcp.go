@@ -2,9 +2,11 @@ package wwcp
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -157,6 +159,41 @@ func getFeed(c appengine.Context, kstr string) (*Feed, error) {
 	return feed, err
 }
 
+func compress(c appengine.Context, in []byte) []byte {
+	buf := &bytes.Buffer{}
+	gz := gzip.NewWriter(buf)
+	_, err := gz.Write(in)
+	if err != nil {
+		c.Warningf("Error compressing: %v", err)
+		return in
+	}
+	err = gz.Close()
+	if err != nil {
+		c.Warningf("Error closing compressed stream: %v", err)
+		return in
+	}
+	return buf.Bytes()
+}
+
+func uncompress(c appengine.Context, in []byte) []byte {
+	gz, err := gzip.NewReader(bytes.NewReader(in))
+	if err == gzip.ErrHeader {
+		c.Infof("Data was not compressed")
+		return in
+	}
+	if err != nil {
+		c.Warningf("Error opening gzip data: %v", err)
+		return in
+	}
+	buf := &bytes.Buffer{}
+	_, err = io.Copy(buf, gz)
+	if err != nil {
+		c.Warningf("Error reading gzip data: %v", err)
+		return in
+	}
+	return buf.Bytes()
+}
+
 func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	kstr := r.URL.Path[8:]
 	_, err := getFeed(c, kstr)
@@ -188,7 +225,7 @@ func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
 	if _, err := taskqueue.Add(c, &taskqueue.Task{
 		Method:  "PULL",
-		Payload: buf.Bytes(),
+		Payload: compress(c, buf.Bytes()),
 		Tag:     kstr,
 	}, "todo"); err != nil {
 		reportError(c, w, err)
@@ -213,7 +250,7 @@ func handlePull(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
 	task := tasks[0]
 
-	buf := bytes.NewReader(task.Payload)
+	buf := bytes.NewReader(uncompress(c, task.Payload))
 	gdec := gob.NewDecoder(buf)
 	msg := &Message{}
 	if err := gdec.Decode(msg); err != nil {
