@@ -25,7 +25,7 @@ import (
 const maxBytes = 2 << 20
 
 func init() {
-	appstats.RecordFraction = 1
+	appstats.RecordFraction = 0.2
 
 	http.Handle("/", appstats.NewHandler(handleIndex))
 	http.Handle("/feeds/", appstats.NewHandler(handleListFeeds))
