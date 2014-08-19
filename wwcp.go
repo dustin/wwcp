@@ -75,7 +75,13 @@ func handleListFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request
 		feeds[i].Key = keys[i]
 	}
 
-	templates.ExecuteTemplate(w, "feeds.html", feeds)
+	err = templates.ExecuteTemplate(w, "feeds.html", struct {
+		Feeds    []Feed
+		Hostname string
+	}{feeds, r.Host})
+	if err != nil {
+		reportError(c, w, err)
+	}
 }
 
 func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) {

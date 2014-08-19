@@ -7,8 +7,13 @@
     <h1>Feeds</h1>
 
     <ul>
-    {{ range . }}
-    <li>{{ .Name }} - {{ .Key.Encode }}</li>
+    {{ range .Feeds }}
+    <li>
+      {{ .Name }} - <tt>{{.Key.Encode}}</tt>
+      <ul>
+        <li>push url: <tt>http://{{$.Hostname}}/q/push/{{.Key.Encode}}</tt></li>
+      </ul>
+    </li>
     {{ end }}
     </ul>
 
