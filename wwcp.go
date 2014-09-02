@@ -54,7 +54,9 @@ type Message struct {
 var templates = template.Must(template.New("").ParseGlob("templates/*.html"))
 
 func handleIndex(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "index.html", nil)
+	if err := templates.ExecuteTemplate(w, "index.html", nil); err != nil {
+		reportError(c, w, err)
+	}
 }
 
 func reportError(c appengine.Context, w http.ResponseWriter, err error) {
