@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/dustin/httputil"
@@ -140,12 +142,25 @@ func main() {
 	parsedBase = mustParse(*base)
 	parsedDest = mustParse(*dest)
 
+	httputil.InitHTTPTracker(true)
+
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt)
+
 	if err := poll(); err != nil {
 		log.Printf("Error polling: %v", err)
 	}
-	for _ = range time.Tick(*pollFreq) {
-		if err := poll(); err != nil {
-			log.Printf("Error polling: %v", err)
+
+	tick := time.Tick(*pollFreq)
+	for {
+		select {
+		case <-tick:
+			if err := poll(); err != nil {
+				log.Printf("Error polling: %v", err)
+			}
+		case <-sigch:
+			log.Printf("Got signal. Shutting down")
+			return
 		}
 	}
 }
