@@ -246,6 +246,10 @@ func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
 func handlePull(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	kstr := r.URL.Path[8:]
+	if kstr == "" {
+		http.Error(w, "No key specified", 400)
+		return
+	}
 	tasks, err := taskqueue.LeaseByTag(c, 1, "todo", 30, kstr)
 	if err != nil {
 		reportError(c, w, err)
