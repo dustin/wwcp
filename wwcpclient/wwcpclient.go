@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	key      = flag.String("key", "", "feed id")
+	key      = flag.String("key", "", "feed id (required)")
 	base     = flag.String("base", "https://wwcp540.appspot.com/", "wwcp base URL")
 	dest     = flag.String("dest", "", "destination URL")
 	pollFreq = flag.Duration("poll-freq", 5*time.Minute,
@@ -138,6 +138,11 @@ func mustParse(s string) *url.URL {
 
 func main() {
 	flag.Parse()
+
+	if *key == "" {
+		flag.Usage()
+		log.Fatalf("Key is required")
+	}
 
 	parsedBase = mustParse(*base)
 	parsedDest = mustParse(*dest)
