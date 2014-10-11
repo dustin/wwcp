@@ -21,6 +21,7 @@ var (
 	dest     = flag.String("dest", "", "destination URL")
 	pollFreq = flag.Duration("poll-freq", 5*time.Minute,
 		"how frequently to check for messages")
+	noop = flag.Bool("noop", false, "if true, just show what we would do")
 
 	parsedBase, parsedDest *url.URL
 
@@ -55,6 +56,11 @@ func deliver(msg *Message) error {
 		req.Header = http.Header{}
 	}
 	req.Header.Set("X-Forwarded-For", msg.RemoteAddr)
+	if *noop {
+		req.Write(os.Stdout)
+		os.Stdout.Write([]byte{'\n', '\n'})
+		return nil
+	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -67,6 +73,10 @@ func deliver(msg *Message) error {
 }
 
 func deleteItem(tid string) error {
+	if *noop {
+		log.Printf("Deleting queued item %v", tid)
+		return nil
+	}
 	u := *parsedBase
 	u.Path = "/q/rm/" + *key + "/" + tid
 	req, err := http.NewRequest("DELETE", u.String(), nil)
