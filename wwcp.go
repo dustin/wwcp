@@ -3,7 +3,9 @@ package wwcp
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -39,6 +41,7 @@ func init() {
 type Feed struct {
 	Owner string
 	Name  string
+	Auth  string
 
 	Key *datastore.Key `datastore:"-"`
 }
@@ -86,10 +89,20 @@ func handleListFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request
 	}
 }
 
+func genAuth() string {
+	b := make([]byte, 8)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic("can't get randomness")
+	}
+	return hex.EncodeToString(b)
+}
+
 func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	feed := &Feed{
 		Owner: user.Current(c).Email,
 		Name:  r.FormValue("name"),
+		Auth:  genAuth(),
 	}
 
 	_, err := datastore.Put(c, datastore.NewIncompleteKey(c, "Feed", nil), feed)
