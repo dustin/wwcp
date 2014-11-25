@@ -32,6 +32,7 @@ func init() {
 	http.Handle("/", appstats.NewHandler(handleIndex))
 	http.Handle("/feeds/", appstats.NewHandler(handleListFeeds))
 	http.Handle("/feeds/new", appstats.NewHandler(handleNewFeed))
+	http.Handle("/feeds/rekey", appstats.NewHandler(handleRekey))
 
 	http.Handle("/q/push/", appstats.NewHandler(handlePush))
 	http.Handle("/q/pull/", appstats.NewHandler(handlePull))
@@ -110,6 +111,33 @@ func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) 
 		reportError(c, w, err)
 		return
 	}
+
+	http.Redirect(w, r, "/feeds/", http.StatusFound)
+}
+
+func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+	kstr := r.URL.Path[12:]
+
+	k, err := datastore.DecodeKey(kstr)
+	if err != nil {
+		c.Warningf("Failed to decode key %q: %v", kstr, err)
+		http.Error(w, "not found", 404)
+		return
+	}
+
+	feed = &Feed{}
+	err = datastore.Get(c, k, feed)
+	if err != nil {
+		c.Warningf("Failed to fetch feed %q: %v", kstr, err)
+		http.Error(w, "not found", 404)
+		return
+	}
+	_, err = datastore.Put(c, k, feed)
+	if err != nil {
+		reportError(c, w, err)
+		return
+	}
+	feedCache.Set(kstr, feed)
 
 	http.Redirect(w, r, "/feeds/", http.StatusFound)
 }
