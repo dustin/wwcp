@@ -112,7 +112,7 @@ func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.Redirect(w, r, "/feeds/", http.StatusFound)
+	http.Redirect(w, r, "/feeds/", http.StatusSeeOther)
 }
 
 func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
