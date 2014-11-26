@@ -12,6 +12,7 @@
       {{ .Name }} - <tt>{{.Key.Encode}}</tt>
       <ul>
         <li>push url: <tt>http://{{$.Hostname}}/q/push/{{.Key.Encode}}</tt></li>
+        <li>auth: <tt>{{.Auth}}</tt></li>
       </ul>
     </li>
     {{ end }}
