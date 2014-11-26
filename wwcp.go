@@ -132,6 +132,7 @@ func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
+	feed.Auth = genAuth()
 	_, err = datastore.Put(c, k, feed)
 	if err != nil {
 		reportError(c, w, err)
@@ -139,7 +140,7 @@ func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	}
 	feedCache.Set(kstr, feed)
 
-	http.Redirect(w, r, "/feeds/", http.StatusFound)
+	http.Redirect(w, r, "/feeds/", http.StatusSeeOther)
 }
 
 type cachedFeed struct {
