@@ -125,7 +125,7 @@ func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feed = &Feed{}
+	feed := &Feed{}
 	err = datastore.Get(c, k, feed)
 	if err != nil {
 		c.Warningf("Failed to fetch feed %q: %v", kstr, err)
