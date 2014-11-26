@@ -32,7 +32,7 @@ func init() {
 	http.Handle("/", appstats.NewHandler(handleIndex))
 	http.Handle("/feeds/", appstats.NewHandler(handleListFeeds))
 	http.Handle("/feeds/new", appstats.NewHandler(handleNewFeed))
-	http.Handle("/feeds/rekey", appstats.NewHandler(handleRekey))
+	http.Handle("/feeds/rekey/", appstats.NewHandler(handleRekey))
 
 	http.Handle("/q/push/", appstats.NewHandler(handlePush))
 	http.Handle("/q/pull/", appstats.NewHandler(handlePull))
@@ -116,7 +116,7 @@ func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-	kstr := r.URL.Path[12:]
+	kstr := r.URL.Path[13:]
 
 	k, err := datastore.DecodeKey(kstr)
 	if err != nil {
