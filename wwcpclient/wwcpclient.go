@@ -136,6 +136,12 @@ func processOne() error {
 
 func poll() error {
 	for {
+		select {
+		case <-quitch:
+			return nil
+		default:
+		}
+
 		err := processOne()
 		switch err {
 		case nil:
@@ -156,6 +162,8 @@ func mustParse(s string) *url.URL {
 	return u
 }
 
+var quitch = make(chan struct{})
+
 func main() {
 	flag.Parse()
 
@@ -171,6 +179,11 @@ func main() {
 
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
+	go func() {
+		<-sigch
+		log.Printf("Got signal, shutting down.")
+		close(quitch)
+	}()
 
 	if err := poll(); err != nil {
 		log.Printf("Error polling: %v", err)
@@ -183,8 +196,7 @@ func main() {
 			if err := poll(); err != nil {
 				log.Printf("Error polling: %v", err)
 			}
-		case <-sigch:
-			log.Printf("Got signal. Shutting down")
+		case <-quitch:
 			return
 		}
 	}
