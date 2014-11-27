@@ -24,7 +24,10 @@ import (
 	"github.com/mjibson/appstats"
 )
 
-const maxBytes = 2 << 20
+const (
+	maxBytes   = 2 << 20
+	authHdrKey = "x-wwcp-auth"
+)
 
 func init() {
 	appstats.RecordFraction = 0.2
@@ -286,12 +289,26 @@ func handlePush(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(201)
 }
 
+func checkAuth(c appengine.Context, feed *Feed, r *http.Request) bool {
+	return r.Header.Get(authHdrKey) == feed.Auth
+}
+
 func handlePull(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	kstr := r.URL.Path[8:]
 	if kstr == "" {
 		http.Error(w, "No key specified", 400)
 		return
 	}
+	feed, err := getFeed(c, kstr)
+	if err != nil {
+		reportError(c, w, err)
+		return
+	}
+	if !checkAuth(c, feed, r) {
+		http.Error(w, "not found", 404)
+		return
+	}
+
 	tasks, err := taskqueue.LeaseByTag(c, 1, "todo", 30, kstr)
 	if err != nil {
 		reportError(c, w, err)
@@ -334,11 +351,16 @@ func handleComplete(c appengine.Context, w http.ResponseWriter, r *http.Request)
 		http.Error(w, "you're doing it wrong", 400)
 		return
 	}
-	_, err := getFeed(c, parts[0])
+	feed, err := getFeed(c, parts[0])
 	if err != nil {
 		reportError(c, w, err)
 		return
 	}
+	if !checkAuth(c, feed, r) {
+		http.Error(w, "not found", 404)
+		return
+	}
+
 	if err := taskqueue.Delete(c, &taskqueue.Task{Name: parts[1]}, "todo"); err != nil {
 		reportError(c, w, err)
 		return
