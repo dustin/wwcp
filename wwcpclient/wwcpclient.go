@@ -15,8 +15,11 @@ import (
 	"github.com/dustin/httputil"
 )
 
+const authHdrKey = "x-wwcp-auth"
+
 var (
 	key      = flag.String("key", "", "feed id (required)")
+	auth     = flag.String("auth", "", "auth key")
 	base     = flag.String("base", "https://wwcp540.appspot.com/", "wwcp base URL")
 	dest     = flag.String("dest", "", "destination URL")
 	pollFreq = flag.Duration("poll-freq", 5*time.Minute,
@@ -83,6 +86,7 @@ func deleteItem(tid string) error {
 	if err != nil {
 		return err
 	}
+	req.Header.Set(authHdrKey, *auth)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -97,7 +101,13 @@ func deleteItem(tid string) error {
 func processOne() error {
 	u := *parsedBase
 	u.Path = "/q/pull/" + *key
-	res, err := http.Get(u.String())
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set(authHdrKey, *auth)
+
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
