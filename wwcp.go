@@ -135,6 +135,11 @@ func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
+	if feed.Owner != user.Current(c).Email {
+		c.Warningf("%v belongs to %v, not %v", kstr, feed.Owner, user.Current(c).Email)
+		http.Error(w, "not found", 404)
+		return
+	}
 	feed.Auth = genAuth()
 	_, err = datastore.Put(c, k, feed)
 	if err != nil {
