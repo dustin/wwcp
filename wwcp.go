@@ -119,6 +119,10 @@ func handleNewFeed(c appengine.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func handleRekey(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, r.Method+" not allowed here", 400)
+		return
+	}
 	kstr := r.URL.Path[13:]
 
 	k, err := datastore.DecodeKey(kstr)
