@@ -31,6 +31,7 @@ var (
 	errDone = errors.New("done")
 )
 
+// A Message is an individual message received at an endpoint on behalf of this client.
 type Message struct {
 	TID         string
 	Created     time.Time   `json:"created"`

@@ -42,6 +42,7 @@ func init() {
 	http.Handle("/q/rm/", appstats.NewHandler(handleComplete))
 }
 
+// A feed is an endpoint that collects posted Messages.
 type Feed struct {
 	Owner string
 	Name  string
@@ -50,6 +51,7 @@ type Feed struct {
 	Key *datastore.Key `datastore:"-"`
 }
 
+// A Message is posted to an endpoint to be replayed later by a client.
 type Message struct {
 	Created     time.Time   `json:"created"`
 	RemoteAddr  string      `json:"remote_addr"`
