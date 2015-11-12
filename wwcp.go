@@ -42,7 +42,7 @@ func init() {
 	http.Handle("/q/rm/", appstats.NewHandler(handleComplete))
 }
 
-// A feed is an endpoint that collects posted Messages.
+// A Feed is an endpoint that collects posted Messages.
 type Feed struct {
 	Owner string
 	Name  string
