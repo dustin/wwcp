@@ -21,6 +21,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/taskqueue"
 	"google.golang.org/appengine/user"
 )
@@ -301,6 +302,8 @@ func handlePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	memcache.Delete(c, kstr)
+
 	w.WriteHeader(201)
 }
 
@@ -316,6 +319,13 @@ func handlePull(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No key specified", 400)
 		return
 	}
+
+	if _, err := memcache.Get(c, kstr); err == nil {
+		log.Debugf(c, "No items (cached)")
+		w.WriteHeader(204)
+		return
+	}
+
 	feed, err := getFeed(c, kstr)
 	if err != nil {
 		reportError(c, w, err)
@@ -333,6 +343,11 @@ func handlePull(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(tasks) != 1 {
 		log.Infof(c, "No tasks found")
+		memcache.Set(c, &memcache.Item{
+			Key:        kstr,
+			Value:      []byte{},
+			Expiration: time.Hour,
+		})
 		w.WriteHeader(204)
 		return
 	}
