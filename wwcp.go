@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"go4.org/syncutil"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
@@ -326,21 +327,34 @@ func handlePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feed, err := getFeed(c, kstr)
-	if err != nil {
+	var feed *Feed
+	var tasks []*taskqueue.Task
+	g := syncutil.Group{}
+
+	g.Go(func() error {
+		var err error
+		feed, err = getFeed(c, kstr)
+		if err != nil {
+			return err
+		}
+		if !checkAuth(c, feed, r) {
+			log.Infof(c, "Auth failed for feed %v", kstr)
+			return errors.New("not found")
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		tasks, err = taskqueue.LeaseByTag(c, 1, "todo", 30, kstr)
+		return err
+	})
+
+	if err := g.Err(); err != nil {
 		reportError(c, w, err)
-		return
-	}
-	if !checkAuth(c, feed, r) {
-		http.Error(w, "not found", 404)
 		return
 	}
 
-	tasks, err := taskqueue.LeaseByTag(c, 1, "todo", 30, kstr)
-	if err != nil {
-		reportError(c, w, err)
-		return
-	}
 	if len(tasks) != 1 {
 		log.Infof(c, "No tasks found")
 		memcache.Set(c, &memcache.Item{
@@ -351,7 +365,6 @@ func handlePull(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
-
 	task := tasks[0]
 
 	buf := bytes.NewReader(uncompress(c, task.Payload))
@@ -362,16 +375,14 @@ func handlePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	j := json.NewEncoder(w)
-	err = j.Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"tid":         task.Name,
 		"headers":     msg.Header,
 		"created":     msg.Created,
 		"query":       msg.QueryString,
 		"remote_addr": msg.RemoteAddr,
 		"body":        msg.Body,
-	})
-	if err != nil {
+	}); err != nil {
 		reportError(c, w, err)
 		return
 	}
