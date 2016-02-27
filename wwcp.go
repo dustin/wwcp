@@ -18,12 +18,11 @@ import (
 
 	"golang.org/x/net/context"
 
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/taskqueue"
 	"google.golang.org/appengine/user"
-
-	"github.com/mjibson/appstats"
 )
 
 const (
@@ -32,16 +31,14 @@ const (
 )
 
 func init() {
-	appstats.RecordFraction = 0.2
+	http.HandleFunc("/", handleIndex)
+	http.HandleFunc("/feeds/", handleListFeeds)
+	http.HandleFunc("/feeds/new", handleNewFeed)
+	http.HandleFunc("/feeds/rekey/", handleRekey)
 
-	http.Handle("/", appstats.NewHandler(handleIndex))
-	http.Handle("/feeds/", appstats.NewHandler(handleListFeeds))
-	http.Handle("/feeds/new", appstats.NewHandler(handleNewFeed))
-	http.Handle("/feeds/rekey/", appstats.NewHandler(handleRekey))
-
-	http.Handle("/q/push/", appstats.NewHandler(handlePush))
-	http.Handle("/q/pull/", appstats.NewHandler(handlePull))
-	http.Handle("/q/rm/", appstats.NewHandler(handleComplete))
+	http.HandleFunc("/q/push/", handlePush)
+	http.HandleFunc("/q/pull/", handlePull)
+	http.HandleFunc("/q/rm/", handleComplete)
 }
 
 // A Feed is an endpoint that collects posted Messages.
@@ -64,9 +61,9 @@ type Message struct {
 
 var templates = template.Must(template.New("").ParseGlob("templates/*.html"))
 
-func handleIndex(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err := templates.ExecuteTemplate(w, "index.html", nil); err != nil {
-		reportError(c, w, err)
+		reportError(appengine.NewContext(r), w, err)
 	}
 }
 
@@ -75,7 +72,8 @@ func reportError(c context.Context, w http.ResponseWriter, err error) {
 	http.Error(w, "Error processing your request", 500)
 }
 
-func handleListFeeds(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handleListFeeds(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	q := datastore.NewQuery("Feed").Filter("Owner = ", user.Current(c).Email)
 	feeds := []Feed{}
 	keys, err := q.GetAll(c, &feeds)
@@ -106,7 +104,8 @@ func genAuth() string {
 	return hex.EncodeToString(b)
 }
 
-func handleNewFeed(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handleNewFeed(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	feed := &Feed{
 		Owner: user.Current(c).Email,
 		Name:  r.FormValue("name"),
@@ -122,7 +121,8 @@ func handleNewFeed(c context.Context, w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/feeds/", http.StatusSeeOther)
 }
 
-func handleRekey(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handleRekey(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	if r.Method != "POST" {
 		http.Error(w, r.Method+" not allowed here", 400)
 		return
@@ -261,7 +261,9 @@ func uncompress(c context.Context, in []byte) []byte {
 	return buf.Bytes()
 }
 
-func handlePush(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handlePush(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
 	kstr := r.URL.Path[8:]
 	_, err := getFeed(c, kstr)
 	if err != nil {
@@ -306,7 +308,9 @@ func checkAuth(c context.Context, feed *Feed, r *http.Request) bool {
 	return r.Header.Get(authHdrKey) == feed.Auth
 }
 
-func handlePull(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handlePull(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
 	kstr := r.URL.Path[8:]
 	if kstr == "" {
 		http.Error(w, "No key specified", 400)
@@ -358,7 +362,9 @@ func handlePull(c context.Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleComplete(c context.Context, w http.ResponseWriter, r *http.Request) {
+func handleComplete(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
 	parts := strings.SplitN(r.URL.Path[6:], "/", 2)
 	if len(parts) != 2 {
 		http.Error(w, "you're doing it wrong", 400)
