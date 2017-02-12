@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -24,7 +25,8 @@ var (
 	dest     = flag.String("dest", "", "destination URL")
 	pollFreq = flag.Duration("poll-freq", 5*time.Minute,
 		"how frequently to check for messages")
-	noop = flag.Bool("noop", false, "if true, just show what we would do")
+	timeout = flag.Duration("timeout", 4*time.Minute+30*time.Second, "poll pass timeout")
+	noop    = flag.Bool("noop", false, "if true, just show what we would do")
 
 	parsedBase, parsedDest *url.URL
 
@@ -41,7 +43,7 @@ type Message struct {
 	Body        []byte      `json:"body"`
 }
 
-func deliver(msg *Message) error {
+func deliver(ctx context.Context, msg *Message) error {
 	u := *parsedDest
 	q, err := url.ParseQuery(msg.QueryString)
 	if err == nil {
@@ -55,6 +57,7 @@ func deliver(msg *Message) error {
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(ctx)
 	req.Header = msg.Header
 	if req.Header == nil {
 		req.Header = http.Header{}
@@ -99,13 +102,17 @@ func deleteItem(tid string) error {
 	return httputil.HTTPError(res)
 }
 
-func processOne() error {
+func processOne(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, *timeout)
+	defer cancel()
+
 	u := *parsedBase
 	u.Path = "/q/pull/" + *key
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set(authHdrKey, *auth)
 
 	res, err := http.DefaultClient.Do(req)
@@ -128,14 +135,16 @@ func processOne() error {
 	}
 
 	log.Printf("Got message %v: query=%q", msg.TID, msg.QueryString)
-	if err = deliver(msg); err != nil {
+	if err = deliver(ctx, msg); err != nil {
 		return err
 	}
 
 	return deleteItem(msg.TID)
 }
 
-func poll() error {
+// poll grabs all the available items from the wwcp upstream and
+// processes them, returning when there are no more to process.
+func poll(ctx context.Context) error {
 	for {
 		select {
 		case <-quitch:
@@ -143,7 +152,7 @@ func poll() error {
 		default:
 		}
 
-		err := processOne()
+		err := processOne(ctx)
 		switch err {
 		case nil:
 		case errDone:
@@ -173,6 +182,8 @@ func main() {
 		log.Fatalf("Key is required")
 	}
 
+	ctx := context.Background()
+
 	parsedBase = mustParse(*base)
 	parsedDest = mustParse(*dest)
 
@@ -186,7 +197,7 @@ func main() {
 		close(quitch)
 	}()
 
-	if err := poll(); err != nil {
+	if err := poll(ctx); err != nil {
 		log.Printf("Error polling: %v", err)
 	}
 
@@ -194,7 +205,7 @@ func main() {
 	for {
 		select {
 		case <-tick:
-			if err := poll(); err != nil {
+			if err := poll(ctx); err != nil {
 				log.Printf("Error polling: %v", err)
 			}
 		case <-quitch:
