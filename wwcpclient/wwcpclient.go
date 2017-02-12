@@ -147,7 +147,7 @@ func processOne(ctx context.Context) error {
 func poll(ctx context.Context) error {
 	for {
 		select {
-		case <-quitch:
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -172,8 +172,6 @@ func mustParse(s string) *url.URL {
 	return u
 }
 
-var quitch = make(chan struct{})
-
 func main() {
 	flag.Parse()
 
@@ -182,7 +180,7 @@ func main() {
 		log.Fatalf("Key is required")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	parsedBase = mustParse(*base)
 	parsedDest = mustParse(*dest)
@@ -194,7 +192,7 @@ func main() {
 	go func() {
 		<-sigch
 		log.Printf("Got signal, shutting down.")
-		close(quitch)
+		cancel()
 	}()
 
 	if err := poll(ctx); err != nil {
@@ -208,7 +206,7 @@ func main() {
 			if err := poll(ctx); err != nil {
 				log.Printf("Error polling: %v", err)
 			}
-		case <-quitch:
+		case <-ctx.Done():
 			return
 		}
 	}
