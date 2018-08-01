@@ -16,7 +16,7 @@ import (
 	"text/template"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"go4.org/syncutil"
 	"google.golang.org/appengine"
