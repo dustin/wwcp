@@ -27,6 +27,7 @@ var (
 		"how frequently to check for messages")
 	timeout = flag.Duration("timeout", 4*time.Minute+30*time.Second, "poll pass timeout")
 	noop    = flag.Bool("noop", false, "if true, just show what we would do")
+	nodel   = flag.Bool("nodel", false, "if true, don't delete processed items")
 
 	parsedBase, parsedDest *url.URL
 
@@ -80,7 +81,7 @@ func deliver(ctx context.Context, msg *Message) error {
 }
 
 func deleteItem(tid string) error {
-	if *noop {
+	if *noop || *nodel {
 		log.Printf("Deleting queued item %v", tid)
 		return nil
 	}
